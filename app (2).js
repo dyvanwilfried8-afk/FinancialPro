@@ -2711,3 +2711,65 @@ try {
   console.error('Init error:', e);
   hideSplash(); // Masquer le splash même si init() plante
 }
+// ── NOUVEAUX MODULES : FISCALITÉ & EMPRUNT ──────────────────────────
+
+function calculerFiscalite() {
+  const fiscRevenuEl = document.getElementById('fiscRevenu');
+  if (!fiscRevenuEl) return;
+  
+  const status = document.getElementById('taxStatus') ? document.getElementById('taxStatus').value : 'standard';
+  // Lecture directe de ton state "salary"
+  let revenuAnnuel = (salary.net || 0) * 12; 
+  
+  let revenuImposable = revenuAnnuel;
+  if (status === 'etudiant') revenuImposable = Math.max(0, revenuAnnuel - 5204);
+  else if (status === 'apprenti') revenuImposable = Math.max(0, revenuAnnuel - 20815);
+
+  let impot = 0;
+  if (revenuImposable > 11294 && revenuImposable <= 28797) impot = (revenuImposable - 11294) * 0.11;
+  else if (revenuImposable > 28797 && revenuImposable <= 82341) impot = (28797 - 11294) * 0.11 + (revenuImposable - 28797) * 0.30;
+  else if (revenuImposable > 82341 && revenuImposable <= 177106) impot = (28797 - 11294) * 0.11 + (82341 - 28797) * 0.30 + (revenuImposable - 82341) * 0.41;
+  else if (revenuImposable > 177106) impot = (28797 - 11294) * 0.11 + (82341 - 28797) * 0.30 + (177106 - 82341) * 0.41 + (revenuImposable - 177106) * 0.45;
+
+  fiscRevenuEl.textContent = Math.round(revenuImposable).toLocaleString('fr-FR') + ' €';
+  document.getElementById('fiscImpot').textContent = Math.round(impot).toLocaleString('fr-FR') + ' €';
+}
+
+function calculerEmprunt() {
+  const empMensualiteEl = document.getElementById('empMensualite');
+  if (!empMensualiteEl) return;
+
+  const tauxAnnuel = parseFloat(document.getElementById('loanRate').value) / 100 || 0.038;
+  const dureeMois = (parseInt(document.getElementById('loanYears').value) || 25) * 12;
+  
+  // Lecture directe de ton state "salary" et "expenses"
+  const revenuMensuel = salary.net || 0;
+  const chargesFixes = expenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+
+  let capaciteMensuelle = (revenuMensuel * 0.35) - chargesFixes;
+  if (capaciteMensuelle < 0) capaciteMensuelle = 0;
+
+  const tauxMensuel = tauxAnnuel / 12;
+  let montantMax = 0;
+  if (tauxMensuel > 0 && capaciteMensuelle > 0) {
+    montantMax = capaciteMensuelle * ((1 - Math.pow(1 + tauxMensuel, -dureeMois)) / tauxMensuel);
+  }
+
+  empMensualiteEl.textContent = Math.round(capaciteMensuelle).toLocaleString('fr-FR') + ' € / mois';
+  document.getElementById('empTotal').textContent = Math.round(montantMax).toLocaleString('fr-FR') + ' €';
+}
+
+// Interception de ton ancienne fonction render() pour y ajouter nos calculs automatiques
+if (typeof render === 'function') {
+  const originalRender = render;
+  render = function() {
+    originalRender(); // Laisse ta base tourner normalement
+    calculerFiscalite();
+    calculerEmprunt();
+  };
+} else {
+  // Sécurité au cas où
+  window.addEventListener('DOMContentLoaded', () => {
+    setInterval(() => { calculerFiscalite(); calculerEmprunt(); }, 1000);
+  });
+}
